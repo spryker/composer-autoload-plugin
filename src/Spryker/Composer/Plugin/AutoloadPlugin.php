@@ -8,14 +8,8 @@
 namespace Spryker\Composer\Plugin;
 
 use Composer\Composer;
-use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\Factory;
-use Composer\Installer;
-use Composer\Installer\PackageEvent;
-use Composer\Installer\PackageEvents;
 use Composer\IO\IOInterface;
-use Composer\Package\RootPackageInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event as ScriptEvent;
 use Composer\Script\ScriptEvents;
@@ -23,7 +17,7 @@ use Symfony\Component\Console\Input\InputInterface;
 
 class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
 {
-    private const CALLBACK_PRIORITY = 50005;
+    private const CALLBACK_PRIORITY = 50100;
 
     /**
      * @var \Composer\Composer
