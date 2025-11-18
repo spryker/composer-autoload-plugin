@@ -17,7 +17,7 @@ use Symfony\Component\Console\Input\InputInterface;
 
 class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
 {
-    private const CALLBACK_PRIORITY = 50100;
+    private const CALLBACK_PRIORITY = -100;
 
     /**
      * @var \Composer\Composer
@@ -103,11 +103,25 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
     protected function addSplitNamespaces(): void
     {
         $package  = $this->composer->getPackage();
-        $namespacesToSplit = $package->getExtra()['splitting']['namespaces'] ?? ['Spryker\\'];
+        $namespacesToSplit = $package->getExtra()['splitting']['namespaces'] ?? ['Spryker\\', 'SprykerShop\\'];
 
+        $repository = $this->composer->getRepositoryManager()->getLocalRepository();
+        $vendorDir = $this->composer->getConfig()->get('vendor-dir');
+        $rootDir = dirname($this->composer->getConfig()->get('vendor-dir'));
+        $relativeVendorDir = substr($vendorDir, strlen($rootDir) + 1);
+        $vendorPsr4 = [];
+        foreach ($repository->getPackages() as $installedPackage) {
+            $packageAutoload = $installedPackage->getAutoload();
+            foreach ($packageAutoload['psr-4'] ?? [] as $namespace => $paths) {
+                foreach ((array)$paths as $path) {
+                    $fullPath = $relativeVendorDir . '/' . $installedPackage->getName() . '/' . $path;
+                    $psr4[$namespace][] = $fullPath;
+                }
+            }
+        }
         $autoload = $package->getAutoload();
         $psr4     = $autoload['psr-4'] ?? [];
-        $root     = getcwd();
+        $psr4 = array_merge($vendorPsr4, $psr4);
 
         foreach ($namespacesToSplit as $namespace) {
             if (!isset($psr4[$namespace])) {
