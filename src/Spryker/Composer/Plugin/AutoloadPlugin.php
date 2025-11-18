@@ -112,10 +112,13 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
         $vendorPsr4 = [];
         foreach ($repository->getPackages() as $installedPackage) {
             $packageAutoload = $installedPackage->getAutoload();
-            foreach ($packageAutoload['psr-4'] ?? [] as $namespace => $paths) {
+            $psr4 = $packageAutoload['psr-4'] ?? [];
+            foreach ($psr4 as $namespace => $paths) {
+                if (!in_array($namespace, $namespacesToSplit, true)) {
+                    continue;
+                }
                 foreach ((array)$paths as $path) {
-                    $fullPath = $relativeVendorDir . '/' . $installedPackage->getName() . '/' . $path;
-                    $vendorPsr4[$namespace][] = $fullPath;
+                    $vendorPsr4[$namespace][] = $relativeVendorDir . '/' . $installedPackage->getName() . '/' . $path;
                 }
             }
         }
