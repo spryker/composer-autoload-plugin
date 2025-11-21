@@ -1,0 +1,32 @@
+{
+    "name": "spryker/composer-autoload-plugin",
+    "description": "Composer plugin to optimize autoload generation for Spryker projects",
+    "type": "composer-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Spryker",
+            "homepage": "https://spryker.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.3",
+        "composer-plugin-api": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Spryker\\Composer\\": "src/Spryker/Composer"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        },
+        "class": "Spryker\\Composer\\Plugin\\AutoloadPlugin"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
