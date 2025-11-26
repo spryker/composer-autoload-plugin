@@ -80,6 +80,7 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
     {
         $this->addSplitNamespaces();
     }
+
     /**
      * @return bool
      */
@@ -109,53 +110,52 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
         $vendorDir = $this->composer->getConfig()->get('vendor-dir');
         $rootDir = dirname($this->composer->getConfig()->get('vendor-dir'));
         $relativeVendorDir = substr($vendorDir, strlen($rootDir) + 1);
-        $vendorPsr4 = [];
         foreach ($repository->getPackages() as $installedPackage) {
             $packageAutoload = $installedPackage->getAutoload();
             $psr4 = $packageAutoload['psr-4'] ?? [];
+            if (!$psr4) {
+                continue;
+            }
+            $namespaceProcessed = false;
             foreach ($psr4 as $namespace => $paths) {
                 if (!in_array($namespace, $namespacesToSplit, true)) {
                     continue;
                 }
-                foreach ((array)$paths as $path) {
-                    $vendorPsr4[$namespace][] = $relativeVendorDir . '/' . $installedPackage->getName() . '/' . $path;
-                }
-            }
-        }
-        $autoload = $package->getAutoload();
-        $psr4     = $autoload['psr-4'] ?? [];
-        $psr4 = array_merge($vendorPsr4, $psr4);
+                $unprocessedFolders = [];
+                foreach (is_array($paths) ? $paths : [$paths] as $folder) {
+                    $folderProcessed = false;
+                    $dirs = glob($relativeVendorDir . DIRECTORY_SEPARATOR . $installedPackage->getName() . DIRECTORY_SEPARATOR . $folder . '*' . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, GLOB_ONLYDIR) ?: [];
+                    foreach ($dirs as $dir) {
+                        $pathParts = explode(DIRECTORY_SEPARATOR, trim($dir, DIRECTORY_SEPARATOR));
+                        $module = array_pop($pathParts);
+                        $layer = array_pop($pathParts);
+                        if (in_array($layer, ['Shared', 'Service', 'Client', 'Yves', 'Glue', 'Zed']) === false) {
+                            // Processes modules that does not follow Spryker module structure like src/SprykerShop/DateTimeConfiguratorPageExample/src/SprykerShop/Configurator/
+                            $psr4[$namespace . $layer . '\\'] = $folder . $layer;
+                            $folderProcessed = true;
 
-        foreach ($namespacesToSplit as $namespace) {
-            if (!isset($psr4[$namespace])) {
-                continue;
-            }
-
-            $unprocessedFolders = [];
-            foreach ($psr4[$namespace] as $folder) {
-                $folderProcessed = false;
-                $dirs = glob($folder . '*' . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, GLOB_ONLYDIR) ?: [];
-                foreach ($dirs as $dir) {
-                    $pathParts = explode(DIRECTORY_SEPARATOR, trim($dir, DIRECTORY_SEPARATOR));
-                    $module = array_pop($pathParts);
-                    $layer = array_pop($pathParts);
-                    if (in_array($layer, ['Shared', 'Service', 'Client', 'Yves', 'Glue', 'Zed']) === false) {
+                            continue;
+                        }
+                        $psr4[$namespace . $layer . '\\' . $module . '\\'] = $folder . $layer . DIRECTORY_SEPARATOR . $module . DIRECTORY_SEPARATOR;
+                        $folderProcessed = true;
+                    }
+                    if ($folderProcessed) {
                         continue;
                     }
-                    $psr4[$namespace . $layer . '\\' . $module . '\\'] = [$dir];
-                    $folderProcessed = true;
-                }
-                if (!$folderProcessed) {
+
                     $unprocessedFolders[] = $folder;
                 }
+                unset($psr4[$namespace]);
+                if (count($unprocessedFolders) > 1) {
+                    $psr4[$namespace] = $unprocessedFolders;
+                }
+                $namespaceProcessed = true;
             }
-            unset($psr4[$namespace]);
-            if (count($unprocessedFolders) > 1) {
-                $psr4[$namespace] = $unprocessedFolders;
+            if (!$namespaceProcessed) {
+                continue;
             }
+            $packageAutoload['psr-4'] = $psr4;
+            $installedPackage->setAutoload($packageAutoload);
         }
-
-        $autoload['psr-4'] = $psr4;
-        $package->setAutoload($autoload);
     }
 }
