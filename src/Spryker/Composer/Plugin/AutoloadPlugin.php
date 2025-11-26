@@ -10,6 +10,8 @@ namespace Spryker\Composer\Plugin;
 use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
+use Composer\Package\CompleteAliasPackage;
+use Composer\Package\AliasPackage;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event as ScriptEvent;
 use Composer\Script\ScriptEvents;
@@ -111,6 +113,14 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
         $rootDir = dirname($this->composer->getConfig()->get('vendor-dir'));
         $relativeVendorDir = substr($vendorDir, strlen($rootDir) + 1);
         foreach ($repository->getPackages() as $installedPackage) {
+            if ($installedPackage instanceof CompleteAliasPackage) {
+                $installedPackage = $installedPackage->getAliasOf();
+            }
+
+            if ($installedPackage instanceof AliasPackage) {
+                continue;
+            }
+
             $packageAutoload = $installedPackage->getAutoload();
             $psr4 = $packageAutoload['psr-4'] ?? [];
             if (!$psr4) {
