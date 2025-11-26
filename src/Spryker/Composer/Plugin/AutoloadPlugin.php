@@ -80,6 +80,7 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
     {
         $this->addSplitNamespaces();
     }
+
     /**
      * @return bool
      */
@@ -132,14 +133,17 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
                             // Processes modules that does not follow Spryker module structure like src/SprykerShop/DateTimeConfiguratorPageExample/src/SprykerShop/Configurator/
                             $psr4[$namespace . $layer . '\\'] = $folder . $layer;
                             $folderProcessed = true;
+
                             continue;
                         }
                         $psr4[$namespace . $layer . '\\' . $module . '\\'] = $folder . $layer . DIRECTORY_SEPARATOR . $module . DIRECTORY_SEPARATOR;
                         $folderProcessed = true;
                     }
-                    if (!$folderProcessed) {
-                        $unprocessedFolders[] = $folder;
+                    if ($folderProcessed) {
+                        continue;
                     }
+
+                    $unprocessedFolders[] = $folder;
                 }
                 unset($psr4[$namespace]);
                 if (count($unprocessedFolders) > 1) {
@@ -147,11 +151,11 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
                 }
                 $namespaceProcessed = true;
             }
-            if ($namespaceProcessed) {
-                $packageAutoload['psr-4'] = $psr4;
-                $installedPackage->setAutoload($packageAutoload);
-                $namespaceProcessed = false;
+            if (!$namespaceProcessed) {
+                continue;
             }
+            $packageAutoload['psr-4'] = $psr4;
+            $installedPackage->setAutoload($packageAutoload);
         }
     }
 }
