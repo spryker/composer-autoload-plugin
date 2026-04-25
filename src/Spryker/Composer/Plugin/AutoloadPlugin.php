@@ -15,7 +15,6 @@ use Composer\Package\AliasPackage;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event as ScriptEvent;
 use Composer\Script\ScriptEvents;
-use Symfony\Component\Console\Input\InputInterface;
 
 class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
 {
@@ -84,34 +83,38 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * @return bool
+     * @param string $projectRoot
+     *
+     * @return array<string, mixed>
      */
-    protected function getOption(IOInterface $io, string $optionName): bool
+    protected function readProjectConfig(string $projectRoot): array
     {
-        $ioReflection = new \ReflectionClass($io);
-
-        $inputReflection = $ioReflection->getProperty('input');
-        $inputReflection->setAccessible(true);
-
-        /** @var InputInterface $input */
-        $input = $inputReflection->getValue($io);
-
-        if (!$input->hasOption($optionName)) {
-            return false;
+        $composerFile = $projectRoot . DIRECTORY_SEPARATOR . \Composer\Factory::getComposerFile();
+        if (!file_exists($composerFile)) {
+            return [];
         }
 
-        return $input->getOption($optionName);
+        $composerData = json_decode(file_get_contents($composerFile), true) ?? [];
+
+        return $composerData['extra']['splitting'] ?? [];
     }
 
     protected function addSplitNamespaces(): void
     {
-        $package  = $this->composer->getPackage();
-        $namespacesToSplit = $package->getExtra()['splitting']['namespaces'] ?? ['Spryker\\', 'SprykerShop\\'];
+        $vendorDir = $this->composer->getConfig()->get('vendor-dir');
+        $rootDir = dirname($vendorDir);
+        $splittingConfig = $this->readProjectConfig($rootDir);
+
+        if ($splittingConfig === []) {
+            return;
+        }
+
+        $namespacesToSplit = $splittingConfig['namespaces'] ?? ['Spryker\\', 'SprykerShop\\'];
+        $layers = $splittingConfig['layers'] ?? ['Shared', 'Service', 'Client', 'Yves', 'Glue', 'Zed'];
 
         $repository = $this->composer->getRepositoryManager()->getLocalRepository();
-        $vendorDir = $this->composer->getConfig()->get('vendor-dir');
-        $rootDir = dirname($this->composer->getConfig()->get('vendor-dir'));
         $relativeVendorDir = substr($vendorDir, strlen($rootDir) + 1);
+
         foreach ($repository->getPackages() as $installedPackage) {
             if ($installedPackage instanceof CompleteAliasPackage) {
                 $installedPackage = $installedPackage->getAliasOf();
@@ -142,7 +145,7 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
                         $module = array_pop($pathParts);
                         $layer = array_pop($pathParts);
                         $splitLevel1Dirs[$packagePathPrefix . $layer . DIRECTORY_SEPARATOR] = true;
-                        if (in_array($layer, ['Shared', 'Service', 'Client', 'Yves', 'Glue', 'Zed']) === false) {
+                        if (in_array($layer, $layers, true) === false) {
                             // Processes modules that does not follow Spryker module structure like src/SprykerShop/DateTimeConfiguratorPageExample/src/SprykerShop/Configurator/
                             $psr4[$namespace . $layer . '\\'] = $folder . $layer;
 
