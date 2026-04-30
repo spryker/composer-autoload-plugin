@@ -133,30 +133,36 @@ class AutoloadPlugin implements PluginInterface, EventSubscriberInterface
                 }
                 $unprocessedFolders = [];
                 foreach (is_array($paths) ? $paths : [$paths] as $folder) {
-                    $folderProcessed = false;
-                    $dirs = glob($relativeVendorDir . DIRECTORY_SEPARATOR . $installedPackage->getName() . DIRECTORY_SEPARATOR . $folder . '*' . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, GLOB_ONLYDIR) ?: [];
+                    $packagePathPrefix = $relativeVendorDir . DIRECTORY_SEPARATOR . $installedPackage->getName() . DIRECTORY_SEPARATOR . $folder;
+                    $level1Dirs = glob($packagePathPrefix . '*' . DIRECTORY_SEPARATOR, GLOB_ONLYDIR) ?: [];
+                    $splitLevel1Dirs = [];
+                    $dirs = glob($packagePathPrefix . '*' . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, GLOB_ONLYDIR) ?: [];
                     foreach ($dirs as $dir) {
                         $pathParts = explode(DIRECTORY_SEPARATOR, trim($dir, DIRECTORY_SEPARATOR));
                         $module = array_pop($pathParts);
                         $layer = array_pop($pathParts);
+                        $splitLevel1Dirs[$packagePathPrefix . $layer . DIRECTORY_SEPARATOR] = true;
                         if (in_array($layer, ['Shared', 'Service', 'Client', 'Yves', 'Glue', 'Zed']) === false) {
                             // Processes modules that does not follow Spryker module structure like src/SprykerShop/DateTimeConfiguratorPageExample/src/SprykerShop/Configurator/
                             $psr4[$namespace . $layer . '\\'] = $folder . $layer;
-                            $folderProcessed = true;
 
                             continue;
                         }
                         $psr4[$namespace . $layer . '\\' . $module . '\\'] = $folder . $layer . DIRECTORY_SEPARATOR . $module . DIRECTORY_SEPARATOR;
-                        $folderProcessed = true;
-                    }
-                    if ($folderProcessed) {
-                        continue;
                     }
 
-                    $unprocessedFolders[] = $folder;
+                    // Keep $folder as a fallback when at least one level-1 subdirectory was not split out
+                    // (e.g. Spryker/Traits/ contains only PHP files and produced no depth-2 matches).
+                    foreach ($level1Dirs as $level1Dir) {
+                        if (!isset($splitLevel1Dirs[$level1Dir])) {
+                            $unprocessedFolders[] = $folder;
+
+                            break;
+                        }
+                    }
                 }
                 unset($psr4[$namespace]);
-                if (count($unprocessedFolders) > 1) {
+                if ($unprocessedFolders !== []) {
                     $psr4[$namespace] = $unprocessedFolders;
                 }
                 $namespaceProcessed = true;
